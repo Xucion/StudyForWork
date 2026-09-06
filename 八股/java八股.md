@@ -1,3 +1,23 @@
+# 面向对象
+
+## 继承
+
+protected：**同一个包内可以访问，不同包的子类也可以访问**。
+
+default：**只有同一个包内的类能访问，包外一律不行**，不管你是不是子类。
+
+## 封装
+
+对象代表什么，就得封装对应的数据，并提供数据对应的行为
+
+## 多态
+
+**同一个行为，在不同对象身上表现出不同的形态**。
+
+定义方法时，使用父类型作为参数，可以接收所有子类对象，体现多态的扩展性与便利性。
+
+​	简单说就是**父类引用指向子类对象，调用方法时执行的是子类的实现**。
+
 # 异常
 
 异常就是代表程序出现的问题，异常的时候会创建一个异常对象。
@@ -245,3 +265,124 @@ jvm中，没有“运行”这个状态，因为线程抢到cpu执行权时，jv
 
 Executors：线程池的工具类通过调用方法返回不同类型的线程池对象。
 
+```
+public static ExecutorService newCachedThreadPool();    创建一个没有上限的线程池
+public static ExecutorService newFixdThreadPool();      创建有上限的线程池
+```
+
+### 自定义线程池
+
+核心参数 
+
+![78867088424](C:\Users\Administrator\Desktop\study\八股\images\1788670884246.png)
+
+**核心线程都在忙且队伍排满了，才会创建临时线程** 
+
+核心线程满了，阻塞队列满了，临时线程满了，会触发拒绝服务策略。
+
+服务拒绝策略（是内部类，为什么？内部类是依赖外部类而存在的，单独出现没有意义，而且内部类又是一个独立的个体）：
+
+​	ThreadPoolExectuor.AbortPolicy：默认策略：丢弃任务并抛出 RejectedExecutionException 异常
+
+​	ThreadPoolExectuor.DiscardPolicy：丢弃任务不抛异常
+
+​	ThreadPoolExectuor.DoscardOldestPolicy：抛弃队列中等待最久的任务，然后把当前任务加入到队列
+
+​	ThreadPoolExectuor.CallerRunsPolicy：调用任务的run方法绕过线程池直接执行
+
+**线程池多大合适？**
+
+​	最大并行数？8核16线程，就是16。
+
+​	CPU密集型运算：最大并行数+1，防止页缺失故障或其他原因，导致线程暂停，额外的线程就可以顶上去，保证cpu的时钟周期不被浪费。
+
+​	I/O密集型运算：最大并行数 * 期望cpu利用率 * 总时间（包括cpu计算时间 + 等待时间） / cpu计算时间
+
+![78867388222](C:\Users\Administrator\Desktop\study\八股\images\1788673882220.png)
+
+用thread dump进行测试：总时间（包括cpu计算时间 + 等待时间） / cpu计算时间
+
+### volatile关键字
+
+volatile保证不同线程对共享变量操作的可见性，也就是说一个线程修改了volatile修饰的变量，当修改写回主内存时，另外一个线程立即看到最新的值。
+
+​      但是volatile不保证原子性。
+
+### CAS & Synchronized
+
+CAS(Compare And Swap)
+
+Synchronized是从悲观的角度出发：
+
+​	总是假设最坏的情况，每次去拿数据的时候都认为别人会修改，所以每次在拿数据的时候都会上锁，这样别人想拿这个数据就会阻塞直到它拿到锁（**共享资源每次只给一个线程使用，其它线程阻塞，用完后再把资源转让给其它线程**）。因此Synchronized我们也将其称之为悲观锁。jdk中的ReentrantLock也是一种悲观锁。
+
+CAS是从乐观的角度出发:
+
+​	总是假设最好的情况，每次去拿数据的时候都认为别人不会修改，所以不会上锁，但是在更新的时候会判断一下在此期间别人有没有去更新这个数据。CAS这种机制我们也可以将其称之为乐观锁。
+
+# Spring
+
+## IoC（Inversion of Control，控制反转）
+
+​	把对象的创建权和管理权从程序员手中，反转给Spring容器。
+
+​	开发者只需要定义好Bean及其依赖关系，Spring容器负责创建和组装这些对象。
+
+```
+//无IoC
+public class UserService {
+    // 程序员自己控制对象的创建
+    private UserDao userDao = new UserDao();     
+    private LogService logService = new LogService();
+    private MailService mailService = new MailService();
+    // 问题：如果 UserDao 构造函数变了，这里也要改，牵一发动全身
+}
+//有IoC
+@Service
+public class UserService {
+    @Autowired
+    private UserDao userDao;      // 不用 new，容器注入
+    @Autowired
+    private LogService logService; // 容器注入
+    // 好处：UserDao 怎么创建的，UserService 完全不用管，由容器负责
+}
+```
+
+在底层做三件事：
+
+| 步骤        | 做什么                                     | 技术手段                                           |
+| ----------- | ------------------------------------------ | -------------------------------------------------- |
+| **1. 扫描** | 找到所有带 `@Component`、`@Service` 等的类 | 类路径扫描（ClassPath Scanning）                   |
+| **2. 创建** | 通过反射调用构造方法，创建对象实例         | Java 反射（`Class.newInstance()`）                 |
+| **3. 存储** | 把对象存到一个大 Map 里（容器）            | `ConcurrentHashMap`，key 是 beanName，value 是对象 |
+
+**Bean的生命周期（IoC的完整流程）**
+
+```
+1. 实例化（通过构造器 new）
+2. 属性注入（@Autowired 赋值）
+3. 初始化（@PostConstruct 或 afterPropertiesSet）
+4. 使用（业务调用）
+5. 销毁（@PreDestroy，容器关闭时清理）
+```
+
+**两种 IoC 容器（Spring 里的具体实现）**
+
+| 容器                   | 特点                              | 使用场景                         |
+| ---------------------- | --------------------------------- | -------------------------------- |
+| **BeanFactory**        | 延迟实例化，用到时才创建          | 资源受限的环境（不常用）         |
+| **ApplicationContext** | 非延迟，启动时就创建所有单例 Bean | 企业级应用（**日常用的就是它**） |
+
+​	在企业级（web）应用里面,我们一般把比较耗时的事情放在系统启动的时候完成。
+
+## DI（依赖注入）
+
+DI 是 IoC 的具体实现方式，它的核心意思是：**当 A 对象需要 B 对象时，不是由 A 自己 new B，而是由外部容器把 B 注入给 A。**
+
+| 方式            | 示例                                                  | 推荐度                           |
+| --------------- | ----------------------------------------------------- | -------------------------------- |
+| **构造器注入**  | `public UserService(UserDao dao) { this.dao = dao; }` | ✅ **最推荐**（不可变，易测试）   |
+| **Setter 注入** | `@Autowired public void setDao(UserDao dao)`          | ⚠️ 可选                           |
+| **字段注入**    | `@Autowired private UserDao dao;`                     | ❌ 虽然方便，但不推荐（难以测试） |
+
+## AOP（面向切面编程）

@@ -15,7 +15,7 @@ public class MyThreadPoolDemo {
 
         //2，提交任务
         pool1.submit(new MyRunnable());
-        
+
         pool1.submit(new MyRunnable());
         pool1.submit(new MyRunnable());
         Thread.sleep(1000);
