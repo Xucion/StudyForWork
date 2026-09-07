@@ -1,5 +1,7 @@
 # 面向对象
 
+把事物抽象成类，把具体实例化为对象，通过封装保护数据，通过继承复用代码，通过多态让程序更灵活。其核心价值是让代码更接近人的思维方式，从而更好地应对复杂软件的开发和维护。
+
 ## 继承
 
 protected：**同一个包内可以访问，不同包的子类也可以访问**。
@@ -146,7 +148,7 @@ Throwable的成员方法
 * 3创建自己的类的对象
 * 4创建一个thread类的对象，并开启线程
 
-由于只会创建以此MyRunnable的对象，所以MyRunnable中的成员变量不用加static关键字了。
+由于只会创建以此MyRunnable的对象，所以MyRunnable中的成员变量不用加static关键字了，非常适合多个相同线程来处理同一份资源的情况。
 ```
 
 3利用Callable接口和Future接口方式实现
@@ -159,6 +161,8 @@ Throwable的成员方法
 * 4.创建Future的对象（作用管理多线程运行的结果，泛型是结果的类型）	FutureTask<Integer> ft = new FutureTask<>(mc);
 * 5.创建Thread类的对象，并启动（表示线程）						Thread t1 = new Thread(ft);
 ```
+
+4.采用[线程池](#线程池)
 
 ![78843999549](C:\Users\Administrator\Desktop\study\八股\images\1788439995491.png)
 
@@ -204,11 +208,43 @@ java采用的是抢占式调度。优先级最小是1，最大是10，默认是5
 
 有执行资格，没有执行权（就绪状态，有资格去抢cpu的执行权，现在还没有抢到，不能执行代码）
 
+详细见[线程状态](#线程的状态)
+
+### 线程的状态
+
+![78859581647](C:\Users\Administrator\Desktop\study\八股\images\1788595816471.png)
+
+jvm中，没有“运行”这个状态，因为线程抢到cpu执行权时，jvm就会把当前的线程交给操作系统去管理了，所以没有运行状态。可以调用线程Thread中的getState()方法获取当前线程的状态。
+
+NEW：尚未启动的线程状态，即线程创建，还未调用start方法
+
+RUNNABLE：就绪状态（调用start，等待调度）+正在运行
+
+BLOCKED：等待监视器锁时，陷入阻塞状态
+
+WAITING：等待状态的线程正在等待另一线程执行特定的操作（如notify）
+
+TIMED_WAITING：具有指定等待时间的等待状态
+
+TERMINATED：线程完成执行，终止状态
+
 ## 线程的安全问题
 
 线程在执行代码时。cpu的执行权随时可能被抢走。  
 
 StringBuilder和StringBuffer类内方法几乎一致，但是StringBuffer是线程安全的，因为其方法加了synchronized关键字。
+
+### java线程安全
+
+在三个方面体现
+
+​	原子性：提供互斥访问，同一时刻只能有一个线程对数据进行操作，在Java中使用了atomic包（这个包提供了一些支持原子操作的类，这些类可以在多线程环境下保证操作的原子性）和synchronized关键字来确保原子性；
+
+​	可见性：一个线程对主内存的修改可以及时地被其他线程看到，在Java中使用了synchronized和volatile这两个关键字确保可见性；
+
+​	有序性：一个线程观察其他线程中的指令执行顺序，由于指令重排序，该观察结果一般杂乱无序，在Java中使用了[happens-before](#happens-before)原则来确保有序性。
+
+
 
 ### **同步代码块：用synchronized(锁对象){ }包裹**
 
@@ -245,13 +281,55 @@ Lock是接口，不能实例化，需要采用实现类ReentranLock来实例化�
 
 或者使用ArrayBlockingQueue阻塞队列put() take()方法
 
-### 线程的状态
 
-![78859581647](C:\Users\Administrator\Desktop\study\八股\images\1788595816471.png)
 
-jvm中，没有“运行”这个状态，因为线程抢到cpu执行权时，jvm就会把当前的线程交给操作系统去管理了，所以没有运行状态。
+### volatile关键字
 
-### 线程池
+volatile保证不同线程对共享变量操作的可见性，也就是说一个线程修改了volatile修饰的变量，当修改写回主内存时，另外一个线程立即看到最新的值。
+
+​      但是volatile不保证原子性。
+
+### CAS & Synchronized
+
+CAS(Compare And Swap)
+
+Synchronized是从悲观的角度出发：
+
+​	总是假设最坏的情况，每次去拿数据的时候都认为别人会修改，所以每次在拿数据的时候都会上锁，这样别人想拿这个数据就会阻塞直到它拿到锁（**共享资源每次只给一个线程使用，其它线程阻塞，用完后再把资源转让给其它线程**）。因此Synchronized我们也将其称之为悲观锁。jdk中的ReentrantLock也是一种悲观锁。
+
+CAS是从乐观的角度出发:
+
+​	总是假设最好的情况，每次去拿数据的时候都认为别人不会修改，所以不会上锁，但是在更新的时候会判断一下在此期间别人有没有去更新这个数据。CAS这种机制我们也可以将其称之为乐观锁。
+
+## 线程的通信
+
+**共享变量**
+
+​	多个线程可以访问和修改同一个共享变量，从而实现信息的传递。为了保证线程安全，通常需要使用 synchronized 关键字或 **volatile 关键字**。
+
+**wait()、notify()和notifyAll()**
+
+​	wait() 方法使当前线程进入等待状态，notify() 方法唤醒在此对象监视器上等待的单个线程，notifyAll() 方法唤醒在此对象监视器上等待的所有线程。（必须写在synchronized内）
+
+**Lock锁**
+
+​	提供和wait()、notify()和notifyAll()类似的方法。
+
+**阻塞队列**
+
+​	java.util.concurrent 包中的 BlockingQueue 接口提供了线程安全的队列操作，当队列满时，插入元素的线程会被阻塞；当队列为空时，获取元素的线程会被阻塞。
+
+
+
+## 数据一致性
+
+**事务管理：**使用数据库事务来确保一组数据库操作要么全部成功提交，要么全部失败回滚。通过ACID（原子性、一致性、隔离性、持久性）属性，数据库事务可以保证数据的一致性。
+
+**锁机制：**使用锁来实现对共享资源的互斥访问。在 Java 中，可以使用 synchronized 关键字、ReentrantLock 或其他锁机制来控制并发访问，从而避免并发操作导致数据不一致。
+
+**版本控制：**通过乐观锁的方式，在更新数据时记录数据的版本信息，从而避免同时对同一数据进行修改，进而保证数据的一致性。
+
+# 线程池
 
 **核心原理**
 
@@ -270,9 +348,25 @@ public static ExecutorService newCachedThreadPool();    创建一个没有上限
 public static ExecutorService newFixdThreadPool();      创建有上限的线程池
 ```
 
+
+
 ### 自定义线程池
 
 核心参数 
+
+* ```
+    ThreadPoolExecutor threadPool = new ThreadPoolExecutor(
+        corePoolSize, // 核心线程数 线程池长期维持的最小线程数
+        corePoolSize * 2, // 最大线程数 线程池能容纳的最多线程数
+    	60L, // 空闲线程存活时间 超过核心线程数的空闲线程 多久后销毁
+      	TimeUnit.SECONDS, // 存活时间单位
+        new ArrayBlockingQueue<>(100), // 任务阻塞队列 核心线程忙时 新任务存这里
+        Executors.defaultThreadFactory(), // 线程创建工厂 用于设置线程名 优先级等
+        new ThreadPoolExecutor.AbortPolicy() // 拒绝策略 队列满且线程数达最大时 如何处理新任务
+     );
+    ```
+
+    ​
 
 ![78867088424](C:\Users\Administrator\Desktop\study\八股\images\1788670884246.png)
 
@@ -302,23 +396,57 @@ public static ExecutorService newFixdThreadPool();      创建有上限的线程
 
 用thread dump进行测试：总时间（包括cpu计算时间 + 等待时间） / cpu计算时间
 
-### volatile关键字
 
-volatile保证不同线程对共享变量操作的可见性，也就是说一个线程修改了volatile修饰的变量，当修改写回主内存时，另外一个线程立即看到最新的值。
 
-​      但是volatile不保证原子性。
+# 反射
 
-### CAS & Synchronized
+反射允许对封装类的**字段（成员变量）**，**方法**和**构造方法**的（所有）信息进行编程访问。
 
-CAS(Compare And Swap)
+## 获取
 
-Synchronized是从悲观的角度出发：
+从class字节码文件中获取的，所以先要学习怎么获取到class字节码文件对象
 
-​	总是假设最坏的情况，每次去拿数据的时候都认为别人会修改，所以每次在拿数据的时候都会上锁，这样别人想拿这个数据就会阻塞直到它拿到锁（**共享资源每次只给一个线程使用，其它线程阻塞，用完后再把资源转让给其它线程**）。因此Synchronized我们也将其称之为悲观锁。jdk中的ReentrantLock也是一种悲观锁。
+​	三种方式
 
-CAS是从乐观的角度出发:
+​	1Class.forName("全类名"); 最常用
 
-​	总是假设最好的情况，每次去拿数据的时候都认为别人不会修改，所以不会上锁，但是在更新的时候会判断一下在此期间别人有没有去更新这个数据。CAS这种机制我们也可以将其称之为乐观锁。
+​	2类名.class; 当作参数进行传递
+
+​	3对象.getClass(); 当已经有了这个类的对象时，才可以使用
+
+### 利用反射获取构造方法
+
+![78875929275](C:\Users\Administrator\Desktop\study\八股\images\1788759292755.png)
+
+获取到class字节码文件对象clazz后，调用clazz.getConstructors()等方法获取到**构造方法对象**。
+
+如果使用clazz.getDeclaredConstructors()获取到了private类型的构造方法对象con4，可以调用con4.setAccessible(true)来**取消临时校验**（**暴力反射**）
+
+### 反射获取成员变量
+
+![78875932172](C:\Users\Administrator\Desktop\study\八股\images\1788759321725.png)
+
+clazz.getFields()
+
+setAccessible(true)
+
+### 反射获取成员方法
+
+![78876195028](C:\Users\Administrator\Desktop\study\八股\images\1788761950289.png)
+
+## 解剖
+
+## 作用
+
+1获取一个类里面所有的信息，获取到了之后，在执行其他的业务逻辑。
+
+2结合配置文件，动态的创建对象并调用方法。
+
+# 动态代理
+
+无侵入式地给代码增加额外功能
+
+
 
 # Spring
 
@@ -326,11 +454,11 @@ CAS是从乐观的角度出发:
 
 ​	把对象的创建权和管理权从程序员手中，反转给Spring容器。
 
-​	开发者只需要定义好Bean及其依赖关系，Spring容器负责创建和组装这些对象。
+​	开发者只需要定 义好Bean及其依赖关系，Spring容器负责创建和组装这些对象。
 
 ```
 //无IoC
-public class UserService {
+public class UserService { 
     // 程序员自己控制对象的创建
     private UserDao userDao = new UserDao();     
     private LogService logService = new LogService();
@@ -377,12 +505,43 @@ public class UserService {
 
 ## DI（依赖注入）
 
-DI 是 IoC 的具体实现方式，它的核心意思是：**当 A 对象需要 B 对象时，不是由 A 自己 new B，而是由外部容器把 B 注入给 A。**
+**DI** 是 IoC 的具体实现方式，它的核心意思是：**当 A 对象需要 B 对象时，不是由 A 自己 new B，而是由外部容器把 B 注入给 A。**
 
-| 方式            | 示例                                                  | 推荐度                           |
-| --------------- | ----------------------------------------------------- | -------------------------------- |
-| **构造器注入**  | `public UserService(UserDao dao) { this.dao = dao; }` | ✅ **最推荐**（不可变，易测试）   |
-| **Setter 注入** | `@Autowired public void setDao(UserDao dao)`          | ⚠️ 可选                           |
-| **字段注入**    | `@Autowired private UserDao dao;`                     | ❌ 虽然方便，但不推荐（难以测试） |
+| 方式            | 示例                                                         | 推荐度                           |
+| --------------- | ------------------------------------------------------------ | -------------------------------- |
+| **构造器注入**  | ` @Autowired public UserService(UserDao dao) { this.dao = dao; }` | ✅ **最推荐**（不可变，易测试）   |
+| **Setter 注入** | `@Autowired public void setDao(UserDao dao)`                 | ⚠️ 可选                           |
+| **字段注入**    | `@Autowired private UserDao dao;`                            | ❌ 虽然方便，但不推荐（难以测试） |
 
 ## AOP（面向切面编程）
+
+作用：在**不惊动原始设计（Spring无侵入式编程）**的基础上为其做**功能增强**
+
+原来设计的功能中的任意位置，叫**连接点**。
+
+对于要追加功能的方法，叫切入点。切入点就是被通知追加功能的**连接点**，连接点 > 切入点。
+
+对于抽取出来的，希望大家都有的功能（即希望增强的功能），叫**通知**。由于功能（方法）不能单独存在，需要依托 类，叫做**通知类**。
+
+怎么把通知和切入点做绑定？中间的对应关系，叫**切面**。
+
+| **日志记录** | 记录方法调用时间、参数、返回值 | `@Before` + `@AfterReturning` |
+| ------------ | ------------------------------ | ----------------------------- |
+| **权限校验** | 检查用户是否有权限执行该方法   | `@Before` 检查权限            |
+| **事务管理** | 开启、提交、回滚事务           | `@Around` 环绕通知            |
+| **性能监控** | 统计方法执行耗时               | `@Around` 计算时间差          |
+| **缓存管理** | 先从缓存取，没有则查数据库     | `@Around` 控制缓存逻辑        |
+| **异常处理** | 统一捕获异常并返回友好提示     | `@AfterThrowing`              |
+
+
+
+# JMM
+
+## happens-before
+
+​	是 JMM 定义的一组可见性和有序性规则，告诉程序员：在什么条件下，一个操作的执行结果对另一个操作是可见的。它是判断多线程程序是否正确的重要依据。
+
+| **程序次序规则**  | 一个线程内，书写在前面的代码 happens-before 书写在后面的代码 | `a = 1;` 执行在 `b = a;` 之前                                |
+| ----------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| **volatile 规则** | 对一个 `volatile` 变量的**写**操作，happens-before 于后续对这个变量的**读**操作 | 你写入 `volatile` 值，其他线程马上看到最新值                 |
+| **锁规则**        | 对一个锁的**解锁**操作，happens-before 于后续对这个锁的**加锁**操作 | 线程 A 释放 `synchronized` 锁后，线程 B 获得同一把锁能看到 A 的修改 |
