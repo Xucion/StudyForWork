@@ -12,7 +12,7 @@ public class _3无重复字符的最长字串 {
             int res = 0;
             for(int left = 0, right = 0; right < s.length(); right++) {
                 char ch = ss[right];
-                while(set.contains(ch)) {
+                while(set.contains(ch)) {//一直移除到没有重复
                     set.remove(ss[left]);
                     left++;
                 }
