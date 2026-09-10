@@ -138,7 +138,7 @@ DQL-执行顺序	![78884397798](C:\Users\Administrator\Desktop\study\八股\imag
 
 ### InnoDB
 
-​	InnoDB是MySQL的默认存储引擎，具有ACID事务支持、行级锁、外键约束等特性。它适用于高并发的读写操作，支持较好的数据完整性和并发控制。
+​	InnoDB是MySQL的默认存储引擎，具有ACID**事务支持、行级锁、外键**约束等特性。它适用于高并发的读写操作，支持较好的数据完整性和并发控制。
 
 ​	如果应用对事务的完整性有比较高的要求，在并发条件下要求数据的一致性，数据操作除了插入和查询之外，还包含很多的更新、删除操作，那么nnoDB存储引擎是比较合适的选择。
 
@@ -305,7 +305,7 @@ B树：多路平衡查找树，以5阶为例，一个节点最多有5个指针�
 **ref**（索引引用）
 
 - 显示索引列和哪个值进行比较
-- 常见值：`const`（常量）、`表名.字段名`（关联查询）	
+	 常见值：`const`（常量）、`表名.字段名`（关联查询）	
 
 **rows**（预估扫描行数）
 
@@ -332,6 +332,7 @@ B树：多路平衡查找树，以5阶为例，一个节点最多有5个指针�
 | **Using join buffer**            | 关联查询没走索引，用了缓冲区         | **需要优化**，给关联字段加索引 |
 | **Impossible WHERE**             | WHERE 条件永远为假                   | 检查 SQL 逻辑                  |
 | **Select tables optimized away** | 查询直接返回聚合结果（如 MIN/MAX）   | 极优！                         |
+| **NULL**                         | 走了索引，但是回表了                 |                                |
 
 ## 索引使用规则
 
@@ -380,8 +381,8 @@ SHOW INDEX FROM table；可以查看索引，其中联合索引的Seq_in_index�
 ​	都是在from表明后添加：
 
 - ​	use index 索引名
-- ​	ignore index 索引名
-- ​	force index 索引名，强制指定，因为use index不一定被mysql采纳
+	 ​	ignore index 索引名
+	 ​	force index 索引名，强制指定，因为use index不一定被mysql采纳
 - ​
 
 ### 覆盖索引
@@ -389,3 +390,162 @@ SHOW INDEX FROM table；可以查看索引，其中联合索引的Seq_in_index�
 ​	尽量使用覆盖索引（查询使用了索引，并且需要返回的列，在该索引中已经全部能够找到），减少select *。
 
 ​	看执行计划中的extra，using index condition：查找使用了索引，但是需要回表查询数据using where；usingindex：查找使用了索引，但是需要的数据都在索引列中能找到，所以不需要回表查询数据
+
+### **前缀索引**
+
+**只取字段的前 N 个字符建索引**，而不是整个字段。
+
+```
+-- 只取 email 的前 10 个字符建索引；email VARCHAR(100),-- 邮箱，平均长度 50 字符
+CREATE INDEX idx_email_prefix ON users(email(10));
+```
+
+**效果**：
+
+- 索引条目只存 `email` 的前 10 个字符
+- 索引大小从 500MB 降到 **100MB**
+- 查询时先用前 10 个字符快速定位，再**回表**精确匹配完整值
+
+**核心指标：区分度Selectivity** = 不重复的前缀数 / 总行数。越接近 1 越好。
+
+```
+-- 测试不同前缀长度的区分度
+SELECT 
+    COUNT(DISTINCT LEFT(email, 5)) / COUNT(*) AS sel_5,
+    COUNT(DISTINCT LEFT(email, 10)) / COUNT(*) AS sel_10,
+    COUNT(DISTINCT LEFT(email, 15)) / COUNT(*) AS sel_15,
+    COUNT(DISTINCT LEFT(email, 20)) / COUNT(*) AS sel_20,
+    COUNT(DISTINCT email) / COUNT(*) AS sel_full
+FROM users;
+```
+
+### 单列索引与联合索引
+
+在业务场景中，如果存在多个查询条件，考虑针对与查询字段建立索引时，建议建立联合索引。需要考虑顺序（最左前缀法则）。
+
+## 索引设计原则
+
+![78901694270](C:\Users\Administrator\Desktop\study\八股\images\1789016942705.png)
+
+# SQL优化
+
+## 插入数据
+
+**insert优化**
+
+- 批量插入（500-100条）
+- 手动提交事务
+- 主键顺序插入性能高于乱序插入
+
+大批量数据插入，用insert语句性能较低，此时可以使用load指令。
+
+![78901776794](C:\Users\Administrator\Desktop\study\八股\images\1789017767949.png)
+
+## 主键优化
+
+- 页分裂：如果乱序插入，会导致页分裂。会把page1 50%的内容移到page3，然后插到page3后面，在调整指针指向。
+- 页合并：当删除一行记录时，实际上记录并没有被物理删除，只是记录被标记(flaged)为删除并且它的空间变得允许被其他记录声明使用。当页中删除的记录达到 MERGE THRESHOLD(默认为页的50%)，InnoDB会开始寻找最靠近的页(前或后)看看是否可以将两个页合并以优化空间使用。
+
+**主键设计原则**
+
+- 满足业务需求的情况下，尽量降低主键的长度。（多个二级索引会占用较大的磁盘空间，且搜索时会消耗大量的磁盘I/O）
+- 插入数据时，尽量选择顺序插入，选择使用AUTO_INCREMENT自增主键。
+- 尽量不要使用UUID（无序的）做主键或者是其他自然主键，如身份证号（太长了）。
+- 业务操作时候，避免对主键修改。（要动索引结构）
+
+## ORDER BY优化
+
+- **Using filesort**：通过表的索引或全表扫描，读取满足条件的数据行，然后在排序缓冲区sort buffer中完成排序操作，所有不是通过索引直接返回排序结果的排序都叫FileSot排序。
+- **Using index**：通过有序索引顺序扫描直接返回有序数据，这种情况即为using index，不需要额外排序，操作效率高。
+
+规则：排序字段必须是索引的“最左前缀”，且顺序一致
+
+假设有联合索引 `idx_age_name (age, name)`：
+
+```
+-- ✅ 走索引（age 是索引第一列）
+SELECT * FROM users ORDER BY age;
+
+-- ✅ 走索引（age + name，顺序和索引一致）
+SELECT * FROM users ORDER BY age, name;
+
+-- ✅ 走索引（WHERE 用了 age，ORDER BY 用 name，仍可利用索引）
+SELECT * FROM users WHERE age = 20 ORDER BY name;
+
+-- ❌ 不走索引（name 不是索引第一列，跳过了 age）
+SELECT * FROM users ORDER BY name;
+
+-- ❌ 不走索引（顺序反了）
+SELECT * FROM users ORDER BY name, age;
+
+-- ❌ 不走索引（一个升序一个降序，MySQL 8.0 前不支持）
+SELECT * FROM users ORDER BY age ASC, name DESC;
+```
+
+**四条优化规则：**
+
+- 根据排序字段建立合适的索引，多字段排序时，也遵循最左前缀法则。
+- 尽量使用覆盖索引。必须是覆盖索引，才会是Using index。
+- 多字段排序，一个升序一个降序，此时需要注意联合索引在创建时的规则（ASC / DESC）
+- 如果不可避免的出现filesort，大数据量排序时，可以适当增大排序缓冲区大小sort_buffer_size（默认256k）
+
+## GROUP BY优化
+
+​	也要满足最左前缀法则。
+
+## LIMIT优化
+
+```
+SELECT * FROM orders ORDER BY id LIMIT 1000000, 10;
+```
+
+MySQL 的执行流程：
+
+1. 走索引（或全表扫描），按 `id` 顺序读取数据
+2. **读取前 100 万 + 10 条记录**
+3. **丢弃前 100 万条**
+4. 返回最后 10 条
+
+**问题**：为了返回 10 条，MySQL 实际读取了 **100 万 + 10 条**，前 100 万条全部被丢弃。这就是深分页慢的根源。
+
+```
+-- 方案1：主键游标（无子查询，最快）
+SELECT * FROM orders WHERE id > 1000000 ORDER BY id LIMIT 10;
+
+-- 方案2：延迟关联（有子查询，支持跳页）
+SELECT o.* FROM orders o
+INNER JOIN (
+    SELECT id FROM orders ORDER BY id LIMIT 1000000, 10
+) AS tmp ON o.id = tmp.id;
+
+-- 方案3：覆盖索引（无子查询，查询字段少时用）
+CREATE INDEX idx_cover ON orders(create_time, id, user_id);
+SELECT id, user_id, create_time FROM orders ORDER BY create_time LIMIT 1000000, 10;
+
+-- 方案4：业务限制（无子查询）
+SELECT * FROM orders ORDER BY id LIMIT 1000;  -- 只允许查前 1000 条
+
+-- 方案5：预计算/缓存（无子查询）
+-- 定时任务把结果存 Redis
+```
+## count优化
+
+explain select count(*) from tb_user;
+
+MyISAM引擎把一个表的总行数存在了磁盘上，因此执行count(”)的时候会直接返回这个数，效率很高;
+
+InnoDB引擎就麻烦了，它执行count(*)的时候，需要把数据一行一行地从引擎里面读出来，然后累积计数。
+
+优化思路：用redis自己计数。
+
+| 写法          | 语义                         | 是否统计 NULL                        |
+| ------------- | ---------------------------- | ------------------------------------ |
+| `COUNT(*)`    | 统计**所有行数**             | ✅ 统计（不判断 NULL）                |
+| `COUNT(1)`    | 统计**所有行数**             | ✅ 统计（不判断 NULL）                |
+| `COUNT(主键)` | 统计**主键非 NULL 的行数**   | ❌ 不统计 NULL（但主键不可能为 NULL） |
+| `COUNT(字段)` | 统计**该字段非 NULL 的行数** | ❌ **不统计 NULL**                    |
+
+## update优化
+
+在更新字段时，尽量走索引，这样是行级锁，避免升级为表锁
+
