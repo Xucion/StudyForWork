@@ -5,7 +5,7 @@ import java.util.Deque;
 
 public class _239滑动窗口最大值 {class Solution {
 
-    // 自定义单调队列（从大到小）
+    // 自定义单调队列（从大到小），，，维护窗口里可能称为最大值的序列，
     class MyQueue {
         Deque<Integer> que = new ArrayDeque<>();  // 双端队列
 
@@ -16,6 +16,7 @@ public class _239滑动窗口最大值 {class Solution {
             }
         }
 
+        // push时如果push进来的元素比前面的都打，前面的元素都要排出。
         // 加入元素：踢掉所有比 value 小的队尾元素，保持单调递减
         void push(int value) {
             while (!que.isEmpty() && value > que.peekLast()) {
