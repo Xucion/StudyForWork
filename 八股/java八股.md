@@ -106,6 +106,135 @@ JVM 提供了一层抽象，让上层 Java 程序不必直接面对不同操作�
 
 java是语言，jvm是平台
 
+# 数据类型
+
+## 数据类型转换方式
+
+![78991091773](C:\Users\Administrator\Desktop\study\八股\images\1789910917737.png)
+
+- 自动类型转换（隐式）：当目标类型的范围大于源类型时，java会自动将源类型转换为目标类型，不需要显式的类型转换。例如，将int转换为long、将float转换为double等。
+- 强制类型转换（显示）
+- 字符串转换：Java提供了将字符串表示的数据转换为其他类型数据的方法。例如，将字符串转换为整型int，可以使用int x = Integer.parseInt("123")；将字符串转换为浮点型double，可以使用Double.parseDouble()方法等。
+- 数值之间的转换：Java提供了一些数值类型之间的转换方法，如将整型转换为字符型、将字符型转换为整型等。这些转换方式可以通过类型的包装类来实现，例如Character类、Integer类等提供了相应的转换方法。
+
+## 计算机怎么存储浮点数
+
+一个浮点数大致被拆成三部分：符号位 + 指数位 + 尾数位
+
+| 类型     | 符号位 | 指数位 | 尾数位 | 偏移量 |
+| -------- | ------ | ------ | ------ | ------ |
+| `float`  | 1 bit  | 8 bit  | 23 bit | 127    |
+| `double` | 1 bit  | 11 bit | 52 bit | 1023   |
+
+(-1)^符号位 × 1.尾数 × 2^(指数 - 偏移量)
+
+- 如5.75 = 101.11₂ = 1.0111₂ × 2²；符号位0（正），指数2（存2+127），尾数部分1.0111，只存0111，后面补0
+
+  最终0 | 10000001 | 01110000000000000000000
+
+## 类型互换的问题
+
+- 大范围数据给小范围数据造成数据溢出，丢弃高位字节
+- double转float，double转int发生精度损失
+
+## 为什么用bigDecimal不用double
+
+double会出现精度丢失的问题，double执行的是二进制浮点运算，二进制不能准确度表示所有小数。
+
+```
+System.out.println(0.05 + 0.01);
+System.out.println(1.0 - 0.42);
+System.out.println(4.015 * 100);
+System.out.println(123.3 / 100);
+输出：
+0.060000000000000005
+0.5800000000000001
+401.49999999999994
+1.2329999999999999
+```
+
+`BigDecimal`可以确保精确的十进制数值计算，避免了使用`double`可能出现的舍入误差。在创建BigDecimal对象时，应该使用字符串作为参数，而不是直接使用浮点数值，以避免浮点数精度丢失。
+
+## 装箱和拆箱是什么
+
+是将基本数据类型和对应的包装类之间进行转换的过程。
+
+```
+Integer i = 10;  //装箱
+int n = i;   //拆箱
+```
+
+自动装箱主要发生在两种情况，一种是赋值时，另一种是在方法调用的时候。
+
+- 赋值时，在Java 1.5以前我们需要手动地进行转换才行，而现在所有的转换都是由编译器来完成。
+- 方法调用时，可以传入原始数据值或者对象，编译器会帮我们进行转换
+
+自动装箱的弊端
+
+​	在一个循环中进行自动装箱操作的情况，如下面的例子就会创建多余的对象，影响程序的性能。
+
+```
+Integer sum = 0; 
+for(int i=1000; i<5000; i++){
+	sum+=i; } 
+```
+
+上面的代码sum+=i可以看成sum = sum + i，但是+这个操作符不适用于Integer对象，首先sum进行自动拆箱操作，进行数值相加操作，最后发生自动装箱操作转换成Integer对象。其内部变化如下
+
+```
+int result = sum.intValue() + i; 
+Integer sum = Integer.valueOf(result); 
+```
+
+由于我们这里声明的 sum 为 Integer 类型，自动装箱实际上由编译器替换为 Integer.valueOf(...) 调用，命中 IntegerCache（默认 -128~127）时会复用缓存对象，但本例中循环值都已超出缓存范围，因此会创建将近 4000 个 Integer 对象，降低程序性能并加重 GC 负担。因此在编程时需要注意：正确声明变量类型，避免因为自动装箱引起的性能问题（另外，new Integer(int) 自 JDK 9 起已被 @Deprecated，应统一使用 Integer.valueOf(int) 或直接自动装箱）。
+
+## 为什么要有包装类
+
+因为基本类型不是对象，但java的很多机制只面向对象。包装成对象可以把数据跟处理这些数据的方法封装在一起，如Integer的parseInt()；
+
+- 泛型中的应用：Java泛型只能使用引用类型，不能用基本类型。所以集合只能存对象。如List<Integer>。
+- null的需要：有的场景需要null而不是0；
+- 包装类本身提供很多工具方法
+- 很多API接受的是Object
+
+## Integer缓存
+
+JVM提前创建好一批常用的Integer对象，以后遇到这些数值时直接复用，而不是每次都创建新对象。
+
+默认情况下范围是-128-127，当通过Integer.valueOf(int)方法创建一个在这个范围内的整数对象时，并不会每次都生成新的对象实例，而是复用缓存中的现有对象，会直接从内存中取出，不需要新建一个对象。
+
+## HashMap实现原理
+
+JDK1.7之前，HashMap数据结构是数组和数组，HashMap通过哈希算法将元素的Key映射到数组的槽位（Bucket）。如果多个key映射到同一槽位，他们会一链表的形式存储在同一个槽位上，因为链表的查询时间是O(n)，所以冲突很严重，一个索引上的链表非常长，效率就很低了。
+
+JDK1.8时做了优化：当某个桶的链表长度≥8（TREEIFY_THRESHOLD）且哈希表数组长度≥64（MIN_TREEIFY_CAPACITY）时，会把链表转换为**红黑树**，把该桶的查找时间复杂度从O(n)降到O(log n)；如果数组长度<64，则只会触发扩容，不会立刻树化。相反的，再resize()过程中，若某个桶的节点数≤6（UNTREEIFY_THRESHOLD），红黑树会被退化为链表。
+
+## HashMap链表发生转换后为什么不用二叉平衡树？
+
+什么是红黑树？红黑树是一种**自平衡二叉查找树**。是为了解决二叉查找树的缺陷。二叉查找树就是有序的二叉树（左小右大）。如果升序/倒序，**二叉查找树会退化为链表结构**。查找性能会大大降低，时间复杂度会从从O(log n)降到O(n)。
+
+红黑树特点：
+
+- 每个节点要么是黑色，要么是红色。
+- 根节点是黑色
+- 每个叶子节点（NIL）是黑色
+- **从根节点到叶子节点的任何一个路径上，不能出现两个连续的红节点。**
+- **从根节点到叶子节点， 任何一条路径上都包含数量相同的黑节点。**
+
+红黑树的平衡是通过**旋转和变色达到自平衡**的。
+
+红黑树的**插入操作**，默认节点是红色。
+
+![78944832954](C:\Users\Administrator\Desktop\study\八股\images\1789448329544.png)
+
+- 插入节点的父节点为黑色，直接插入。
+- 插入节点的父节点为红色：
+
+
+# 面向对象
+
+把事物抽象成类，把具体事物实例化为对象，对象具有的属性称为字段，行为称为方法。通过封装保护数据，通过继承复用代码，通过多态让程序更灵活。其核心价值是让代码更接近人的思维方式，从而更好地应对复杂软件的开发和维护。
+
 ## 继承
 
 是一种可以使得子类自动共享父类数据结构和方法的机制。它是代码复用的重要手段，可以建立类与类之间的层次关系，使得结构更加清晰。
@@ -130,7 +259,7 @@ default：**只有同一个包内的类能访问，包外一律不行**，不管
 
 多态体现在
 
-- **方法重载：**是指同一个类中有多个同名方法的实现，但是传入参数不同，编译器会在在编译时确定调用哪个方法。
+- 方法重载：是指同一个类中有多个同名方法的实现，但是传入参数不同，编译器会在在编译时确定调用哪个方法。
 
 - **方法重写：**指子类能够提供父类中同名方法的具体实现，在运行时，JVM回根据对象的实际类型，确定调用哪个版本的方法。这是实现多态的主要方式。 
 
@@ -138,10 +267,10 @@ default：**只有同一个包内的类能访问，包外一律不行**，不管
 
 - **向上转型和向下转型：**
 
-  | 转型     | 例子                    | 是否需要强制转换 | 安全性   |
-  | -------- | ----------------------- | ---------------- | -------- |
-  | 向上转型 | `Animal a = new Dog();` | 不需要           | 通常安全 |
-  | 向下转型 | `Dog d = (Dog) a;`      | 需要             | 可能报错 |
+  | 转型     | 例子                    | 是否需要强制转换 | 安全性     |
+  | -------- | ----------------------- | ---------------- | ---------- |
+  | 向上转型 | `Animal a = new Dog();` | 不需要           | 通常安全   |
+  | 向下转型 | `Dog d = (Dog) a;`      | 需要             | 可能有异常 |
 
 ## 抽象类和普通类的区别
 
@@ -162,6 +291,39 @@ default：**只有同一个包内的类能访问，包外一律不行**，不管
 ## 抽象类能加final修饰吗？
 
 不能，抽象类是用来被继承的，而final修饰符用于禁止类被继承或方法被重写，因此，抽象类和final修饰符互斥。
+
+## 非静态内部类和静态内部类的区别？
+
+- 非静态内部类依赖于外部类的实例，而静态内部类不依赖与外部类的实例。
+- 非静态内部类可以直接访问外部类的所有成员（包括实例变量和方法）；静态内部类可以直接访问外部类的静态成员，访问外部类的实例成员则必须通过外部类的实例引用。
+- 非静态内部类不能定义静态成员（Java 16 之前），而静态内部类可以定义静态成员。
+
+## 非静态内部类可以直接访问外部方法
+
+非静态内部类可以直接访问外部方法是因为编译器在生成字节码时会为非静态内部类维护一个指向外部实例的引用。
+
+这个引用是的非静态内部类能够访问外部类的实例变量和方法。编译器会在生成非静态内部类的构造方法时，将外部类实例作为参数传入，并在内部类的实例化过程中建立外部类实例与内部类实例之间的联系，从而实现直接访问外部方法的功能。
+
+# 关键字
+
+## java中final的作用是什么
+
+主要有三个作用，修饰类、方法和变量
+
+- 修饰类：表示这个类不能被继承，保证类的不可变性和安全性。
+- 修饰方法：表示这个方法不能在子类中被重写。比如java.lang.Object类中的getClass方法，因为这个方法的行为是由java虚拟机底层实现来保证的，不应该被子类修改。
+- 修饰变量：表示该变量不能再被重新赋值，否则会导致编译错误。但是，对于引用数据类型，final修饰意味着这个引用变量不能再指向其他对象，但对象本身的内容是可以改变的。
+
+## static的作用是什么
+
+static关键字主要是用于修饰类的成员（变量、方法、代码块）和内部类，其核心作用是将成员与类本身关联，而非与类的实例（对象）关联。
+
+- 修饰变量：staic修饰的变量属于类本身，而非类的具体实例。所有对象共享一份静态变量，内存中只存在一份副本。可以通过类名直接访问，也可通过实例访问（不推荐）
+- 修饰方法：静态方法属于类，但不属于任何实例，因此不能直接访问类中的非静态成员（变量/方法，因为非静态成员依赖实例对象存在），但可以访问静态成员。
+- 修饰代码块：静态代码块在类初始化阶段（即执行<client>时），且执行一次（优于对象构造方法），用于初始化静态变量或执行类级别的预处理操作。JVM的类生命周期为：加载 → 链接（验证、准备、解析）→ 初始化，静态代码块属于"初始化"阶段而非"加载"阶段。
+- 修饰内部类：转为静态内部类，不依赖于外部类实例，可以独立存在，
+
+# 深拷贝和浅拷贝
 
 ## 深拷贝和浅拷贝的区别
 
@@ -188,21 +350,24 @@ default：**只有同一个包内的类能访问，包外一律不行**，不管
 
   ​
 
-      class Person {
-          String name;
-          Address address;
-          
-          Person(String name, Address address) {
-              this.name = name;
-              this.address = address;
-          }
+  ```
+  class Person {
+      String name;
+      Address address;
       
-          // 深拷贝构造方法
-          Person(Person other) {
-              this.name = other.name;
-              this.address = new Address(other.address);
-          }
+      Person(String name, Address address) {
+          this.name = name;
+          this.address = address;
       }
+
+      // 深拷贝构造方法
+      Person(Person other) {
+          this.name = other.name;
+          this.address = new Address(other.address);
+      }
+  }
+  ```
+
   使用：
 
   ```
@@ -250,49 +415,97 @@ default：**只有同一个包内的类能访问，包外一律不行**，不管
 
   通过将对象序列化为字节流，再从字节流反序列化为对象来实现深拷贝。要求所有对象及其引用类型字段都实现Serializable 接口
 
-## 数据类型转换方式
 
-![78991091773](C:\Users\Administrator\Desktop\study\八股\images\1789910917737.png)
+# 泛型
 
-- 自动类型转换（隐式）：当目标类型的范围大于源类型时，java会自动将源类型转换为目标类型，不需要显式的类型转换。例如，将int转换为long、将float转换为double等。
-- 强制类型转换（显示）
-- 字符串转换：Java提供了将字符串表示的数据转换为其他类型数据的方法。例如，将字符串转换为整型int，可以使用Integer.parseInt()方法；将字符串转换为浮点型double，可以使用Double.parseDouble()方法等。
-- 数值之间的转换：Java提供了一些数值类型之间的转换方法，如将整型转换为字符型、将字符型转换为整型等。这些转换方式可以通过类型的包装类来实现，例如Character类、Integer类等提供了相应的转换方法。
+他允许类、接口和方法在定义时使用一个或多个类型参数，这些类型参数在使用时可以被指定为具体的类型。
 
-## HashMap实现原理
+- 适用于多种数据类型执行相同的代码。如果没有泛型，要实现不同类型的加法，每种类型都需要重载，通过泛型，可以复用为一个方法。
+- 泛型中的类型在使用时指定，他将提供类型的约束，提供编译前的检查，用来保证类型安全。
 
-JDK1.7之前，HashMap数据结构是数组和数组，HashMap通过哈希算法将元素的Key映射到数组的槽位（Bucket）。如果多个key映射到同一槽位，他们会一链表的形式存储在同一个槽位上，因为链表的查询时间是O(n)，所以冲突很严重，一个索引上的链表非常长，效率就很低了。
+# 对象
 
-JDK1.8时做了优化：当某个桶的链表长度≥8（TREEIFY_THRESHOLD）且哈希表数组长度≥64（MIN_TREEIFY_CAPACITY）时，会把链表转换为**红黑树**，把该桶的查找时间复杂度从O(n)降到O(log n)；如果数组长度<64，则只会触发扩容，不会立刻树化。相反的，再resize()过程中，若某个桶的节点数≤6（UNTREEIFY_THRESHOLD），红黑树会被退化为链表。
+## java创建对象有哪些方式？
 
-## HashMap链表发生转换后为什么不用二叉平衡树？
+- 1使用new关键字：通过调用类的构造器来实例化对象。
+- 2使用Class类的newInstance()方法：通过java的反射API，在运行时动态的创建对象。这种方式不需要在编译时知道具体的类。应用场景：框架设计(Spring的IOC容器)，动态代理
 
-什么是红黑树？红黑树是一种**自平衡二叉查找树**。是为了解决二叉查找树的缺陷。二叉查找树就是有序的二叉树（左小右大）。如果升序/倒序，**二叉查找树会退化为链表结构**。查找性能会大大降低，时间复杂度会从从O(log n)降到O(n)。
+```
+先定义统一接口：
+interface Pay {
+    void pay();
+}
 
-红黑树特点：
+两个实现类：
+class AliPay implements Pay {
+    @Override
+    public void pay() {
+        System.out.println("使用支付宝支付");
+    }
+}
+class WeChatPay implements Pay {
+    @Override
+    public void pay() {
+        System.out.println("使用微信支付");
+    }
+}
 
-- 每个节点要么是黑色，要么是红色。
-- 根节点是黑色
-- 每个叶子节点（NIL）是黑色
-- **从根节点到叶子节点的任何一个路径上，不能出现两个连续的红节点。**
-- **从根节点到叶子节点， 任何一条路径上都包含数量相同的黑节点。**
+String className = 从配置文件读取;
+Pay pay = (Pay) Class.forName(className)
+                     .getDeclaredConstructor()
+                     .newInstance();
+```
 
-红黑树的平衡是通过**旋转和变色达到自平衡**的。
+-  3使用clone()方法：通过实现Cloneable接口并重写Object类的clone()方法，可以基于一个现有对象（原型）创建一个新的副本对象
+- 4使用反序列化：通过ObjectInputStream从一个字节流（通常是文件或网络）中重建一个对象。特点是不会调用构造器，类必须实现java.io.Serializable接口。
 
-红黑树的**插入操作**，默认节点是红色。
+```
+import java.io.*;
 
-![78944832954](C:\Users\Administrator\Desktop\study\八股\images\1789448329544.png)
+// 必须实现 Serializable 接口
+public class Person implements Serializable {
+    private String name;
+    // ... 构造器和其他方法 ...
+}
 
-- 插入节点的父节点为黑色，直接插入。
-- 插入节点的父节点为红色：
+public class Main {
+    public static void main(String[] args) {
+        Person personToSave = new Person("David");
+        
+    // 序列化对象到文件
+    try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream("person.dat"))) {
+        oos.writeObject(personToSave);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        
 
+    // 从文件反序列化对象
+    try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream("person.dat"))) {
+        Person restoredPerson = (Person) ois.readObject(); // 创建新对象
+        restoredPerson.sayHello(); // 输出: Hello, David
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
 
+- 5使用工厂模式：这是一种设计模式，不直接使用new，而是通过一个方法来返回对象实例，getInstance()和valueOf()都是常见的工厂方法。Java 标准库中的例子：Integer.valueOf(int)，Calendar.getInstance()。
 
-面向对象
+## New出的对象什么时候回收
 
-把事物抽象成类，把具体实例化为对象，通过封装保护数据，通过继承复用代码，通过多态让程序更灵活。其核心价值是让代码更接近人的思维方式，从而更好地应对复杂软件的开发和维护。
+通过关键字new创建的对象，由Java的垃圾回收器（Garbage Collector）负责回收。垃圾回收器的工作是在程序运行过程中自动进行的，他会周期性的检测不再被引用的对象，并将其回收释放内存。
 
+具体的，回收时机是由GC根据一下机制来判断的
 
+- 可达性分析算法
+- 终结器
+
+## 如何获取私有对象
+
+- 公共的getter方法
+- 反射机制：允许在允许时检查和修改类、方法、字段等信息，通过反射可以绕过private访问修饰符的限制来获取私有对象。
 
 # 异常
 
@@ -718,11 +931,227 @@ setAccessible(true)
 
 2结合配置文件，动态的创建对象并调用方法。
 
+## 反射在平时写代码或者框架中的应用常见有哪些
+
+- 加载数据库驱动：项目底层数据库有时是用mysql，有时用oracle，需要动态的根据实际情况加载驱动类[见创建对象的方式2](#java创建对象有哪些方式？)
+
+- **Spring IOC / 依赖注入**
+
+  Spring 启动时扫描 `@Component`、`@Service`、`@Controller` 等类，然后通过反射创建 Bean；看到 `@Autowired`、`@Resource` 时，再通过反射把依赖注入进去。
+
+- **Spring MVC：为什么一个URL能自动找到你的方法**
+
+  比如写
+
+  ```
+  @RestController
+  @RequestMapping("/user")
+  public class UserController {
+  	@GetMapping("/{id}")
+  	public User getUser(@PathVariable Long id) {
+      	return userService.getById(id);
+  	}
+  }
+  ```
+
+  然后浏览器请求：GET /user/100，Spring 是怎么知道应该执行：getUser() 的？
+
+  ​	spring启动时，会扫描Controller，反射获取类上的注解@RequestMapping("/user")，把 URL → 方法 的映射关系存进 Map，请求来了，DispatcherServlet拿URL去Map里查找，找到方法后用反射调用（Method.invoke()）
+
+  ​
+
+- 是待补充
+
+# 注解
+
+自定义一个注解：
+
+```
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface MyAnnotation {
+    String name();//一个注解方法
+    int age() default 18;//一个注解方法，带默认值
+}
+```
+
+编译后，Java 编译器会把它变成一个**接口**：
+
+```
+// 反编译后大概长这样
+public interface MyAnnotation extends java.lang.annotation.Annotation {
+    String name();
+    int age();
+}
+```
+
+注意：**注解本质上是一个继承自 Annotation 的接口**，它的“方法”就是注解的属性。
+
+```
+你写代码：
+  @MyAnnotation(name = "张三", age = 20)
+         ↓
+编译：
+  注解信息写入 .class 文件的常量池（RuntimeVisibleAnnotations）
+         ↓
+JVM 加载类：
+  解析常量池中的注解信息 → 生成 memberValues Map
+         ↓
+反射调用 getAnnotation()：
+  创建 AnnotationInvocationHandler（持有 memberValues）
+  创建 JDK 动态代理对象
+         ↓
+你调用 anno.name()：
+	实际并不会执行某个真实的方法体，而是被 JDK 动态代理拦截，转交给AnnotationInvocationHandler.invoke() 处理，最终从 memberValues Map 中取值返回。
+  代理拦截 → invoke() → memberValues.get("name") → 返回 "张三"
+```
+
+## 注解的原理
+
+直接的本质是一个继承了Annotation的特殊接口，作用是**：给代码打“标签”，让框架或工具在编译期或运行期读取这些标签，从而自动完成某些逻辑。**
+
+其具体实现类是Java运行时生成的动态代理类（反射调用时
+
+```
+MyAnnotation anno = clazz.getAnnotation(MyAnnotation.class);
+```
+
+拿到的**不是** `MyAnnotation` 的普通实现类实例，而是一个 **JDK 动态代理对象**。）。
+
+调用自定义注解的方法时，会转发给AnnotationInvocationHandler，然后调用其中的invoke方法。该方法会从memberValues这个Map中索引出对应的值。（memberValues的来源是Java常量池）
+
+## 注解解析的底层实现
+
+注解的解析主要依赖于 Java 的反射机制。以下是解析注解的基本流程：
+1、获取注册信息：通过反射 API 可以获取类、方法、字段等元素上的注解。例如：
+
+```
+Class<?> clazz = MyClass.class;
+MyAnnotation annotation = clazz.getAnnotation(MyAnnotation.class);
+if (annotation != null) {
+    System.out.println(annotation.value());
+}
+```
+
+
+2、底层原理：反射机制的核心类是 java.lang.reflect.AnnotatedElement，它是所有可以被注解修饰的元素（如 Class、Method、Field 等）的父接口。该接口提供了以下方法：
+
+- getAnnotation(Class<T> annotationClass)：获取指定类型的注解。
+- getAnnotations()：获取所有注解。
+- isAnnotationPresent(Class<? extends Annotation> annotationClass)：判断是否包含指定注解。
+
+这些方法本身由纯 Java 实现，并不是 native 方法。以 Class.getAnnotation(...) 为例，其内部会先触发注解数据的延迟解析：通过 AnnotationParser.parseAnnotations(...) 读取 JVM 在类加载阶段从 class 文件属性（RuntimeVisibleAnnotations 等）中抽取并传回的原始字节，反序列化成 Map<Class<? extends Annotation>, Annotation>，最终以动态代理对象（AnnotationInvocationHandler）的形式返回给调用方。
+
+JVM 在类加载阶段确实会解析 .class 文件中的注解信息，但这部分工作对应的 native 接口位于底层的常量池与属性表读取，而不是 getAnnotation 这一层 API。
+
+因此，注解解析的底层实现主要依赖于 Java 的反射机制和字节码文件的存储。通过 @Retention 元注解可以控制注解的保留策略，当使用 RetentionPolicy.RUNTIME 时，可以在运行时通过反射 API 来解析注解信息。在 JVM 层面，会从字节码文件中读取注解信息，并创建注解的代理对象来获取注解的属性值。
+
+# Object
+
+Java Object 类是所有类的超类，默认提供 11 个核心方法，核心用于对象比较、哈希、字符串表示、线程同步等。
+
+两个注意点：
+
+- equals 配套的必须重写 hashCode 方法，因为 Java 的约定是如果两个对象 equals 返回 true，它们的 hashCode 必须相等；如果 hashCode 不相等，equals 一定返回 false。如果只重写 equals 不重写 hashCode，会导致对象在 HashMap HashSet 等集合中无法正确存储，比如两个 id 相同的 User 对象，equals 返回 true，但 hashCode 不同，会被当成两个不同元素存入集合。
+- finalize 方法，它是对象被垃圾回收器回收前会调用的方法，默认是空实现。但现在基本不推荐使用，因为它的执行时机不确定，可能很久才执行甚至不执行，而且可能导致对象复活，影响垃圾回收效率，Java9 之后已经标记为过时，替代方案是使用 try with resources 或者 PhantomReference 来处理资源释放。
+
+## ==和equals有什么区别
+
+==比较的是地址，equals比较的是内容
+
+```
+String a = new String("hello");
+String b = new String("hello");
+System.out.println(a == b);  // 输出 false
+System.out.println(a.equals(b));  // 输出 true
+
+陷阱：
+String c = "hello";
+String d = "hello";
+System.out.println(c == d);  // 输出 true
+直接用双引号创建字符串的时候，JVM 会把它扔到一个叫"字符串常量池"的地方。如果池子里已经有了 "hello"，那 d 就直接复用 c 指向的那个对象，所以它俩地址是一样的
+```
+
+## hashcode和equals的关系
+
+equals为true，hashcode一定ture；hashcode为true，equals不一定true（hash碰撞）。
+
+## String、StringBuffer、StringBuilder的区别和联系
+
+| 特性         | String                         | StringBuilder    | StringBuffer     |
+| ------------ | ------------------------------ | ---------------- | ---------------- |
+| **不可变性** | 不可变（修改会生成一个新对象） | 可变             | 可变             |
+| **线程安全** | 是（因不可变）                 | 否               | 是（同步方法）   |
+| **性能**     | 低（频繁修改时）               | 高（单线程）     | 中（多线程安全） |
+| **适用场景** | 静态字符串                     | 单线程动态字符串 | 多线程动态字符串 |
+
+# Java新特性
+
+
+
 # 动态代理
 
 无侵入式地给代码增加额外功能
 
+------
 
+------
+
+# 集合概念
+
+------
+
+------
+
+# 内存模型
+
+## jvm的内存模型介绍一下
+
+JVM运行时内存共分为虚拟机栈、堆、方法区（后被元空间取代）、程序计数器、本地方法栈。
+
+- 方法区（Method Area）
+
+  JVM规范定义的一块线程共享的逻辑内存区域，主要用于存放“类级别的信息”。
+
+  主要存储类元数据，字段信息，方法信息，方法字节码，运行时常量池等一些类级别相关信息。
+
+  ​
+
+- 堆
+
+  堆是线程共享的运行时内存区域，存放对象实例，包括程序中创建的对象，以及java虚拟机自动创建的对象和数组。
+
+  堆空间可以分为新生代和老年代，还包括持久代（JDK7及前)或元空间（JDK8及后）
+
+  特点
+
+  - 线程共享
+  - 主要存放对象和数组
+  - GC的主要管理区域
+  - 容量通常最大
+  - 可能发生OutOfMemoryError
+
+- 栈
+
+  存储一切和方法有关的（局部变量、方法调用的参数、方法返回地址以及一些临时数据），且存的一般是对象的引用，真正的对象实例通常在堆里。
+
+  每个线程都用自己独立的虚拟机栈，方法调用一次，就会创建一个栈帧如栈；方法执行结束，对应栈帧出栈，
+
+  栈帧包括：局部变量表，操作数栈，动态链接、方法出口等信息。StackOverflowError 和 OutOfMemoryError
+
+- 本地方法栈
+
+  与Java虚拟机栈类似，用于存储执行本地（Native）方法的数据。StackOverflowError 和 OutOfMemoryError
+
+  ​
+
+- 程序计数器（PC Register）
+
+  每个线程都有一个程序计数器，用于记录当前线程正在执行的JVM字节码指令的位置，线程切换回来以后，能够从之前的位置继续执行。没有规定任何OOM情况。
+
+------
+
+------
 
 # Spring
 
