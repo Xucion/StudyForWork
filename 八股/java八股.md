@@ -1097,9 +1097,13 @@ equals为true，hashcode一定ture；hashcode为true，equals不一定true（has
 
 ------
 
+————————————————————————**以上是java基础**——————————————————————
+
 ------
 
-# 集合概念
+# Java集合概念
+
+## 概念
 
 ------
 
