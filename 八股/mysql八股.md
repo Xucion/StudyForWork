@@ -31,9 +31,9 @@
 
 ​	起始索引从0开始，起始索引 = （查询页码 - 1）* 每页显示记录数；如果查询的是第一页的数据，起始索引可以省略，直接写limit 10。
 
-DQL-执行顺序	![78884397798](C:\Users\Administrator\Desktop\study\八股\images\1788843977980.png)
+DQL-执行顺序	![78884397798](images/1788843977980.png)
 
-外键约束：![78884557580](C:\Users\Administrator\Desktop\study\八股\images\1788845575807.png)
+外键约束：![78884557580](images/1788845575807.png)
 
 ## 关系型数据库vs非关系型
 
@@ -144,7 +144,7 @@ DQL-执行顺序	![78884397798](C:\Users\Administrator\Desktop\study\八股\imag
 
 ​	xxx.idb文件：xxx代表表名，innoDB引擎的每张表都会对应这样一个表空间文件，存储该表的表结构、数据和索引。
 
-![78885479142](C:\Users\Administrator\Desktop\study\八股\images\1788854791423.png)
+![78885479142](images/1788854791423.png)
 
 ### MyISAM
 
@@ -162,11 +162,11 @@ DQL-执行顺序	![78884397798](C:\Users\Administrator\Desktop\study\八股\imag
 
 ​	Mysql对大数据表构建索引，也需要很长时间（构建B+树）。
 
-![78885699815](C:\Users\Administrator\Desktop\study\八股\images\1788856998157.png)
+![78885699815](images/1788856998157.png)
 
 ## 索引结构
 
-![78885727852](C:\Users\Administrator\Desktop\study\八股\images\1788857278524.png)
+![78885727852](images/1788857278524.png)
 
 二叉树缺点：顺序插入时，会形成一个链表，性能大大降低。大数据量情况下，层级较深，检索速度慢。
 
@@ -178,7 +178,7 @@ B树：多路平衡查找树，以5阶为例，一个节点最多有5个指针�
 
 在Mysql的索引结构中，叶子节点会形成一个双向链表。
 
-![78888321505](C:\Users\Administrator\Desktop\study\八股\images\1788883215054.png)
+![78888321505](images/1788883215054.png)
 
 **Hash**：不支持范围查询，无法完成排序，查询效率高，通常高于B+树索引
 
@@ -202,9 +202,9 @@ B树：多路平衡查找树，以5阶为例，一个节点最多有5个指针�
 
 **按照存储形式分类：**聚集索引；二级索引（手动创建的都是二级索引）
 
-![78892346945](C:\Users\Administrator\Desktop\study\八股\images\1788923469456.png)
+![78892346945](images/1788923469456.png)
 
-![78892367647](C:\Users\Administrator\Desktop\study\八股\images\1788923676475.png)
+![78892367647](images/1788923676475.png)
 
 **回表查询**：先走二级索引找到对应的主键值，再根据主键值到聚集索引中找到这一行的行数据。
 
@@ -425,7 +425,7 @@ FROM users;
 
 ## 索引设计原则
 
-![78901694270](C:\Users\Administrator\Desktop\study\八股\images\1789016942705.png)
+![78901694270](images/1789016942705.png)
 
 # SQL优化
 
@@ -439,7 +439,7 @@ FROM users;
 
 大批量数据插入，用insert语句性能较低，此时可以使用load指令。
 
-![78901776794](C:\Users\Administrator\Desktop\study\八股\images\1789017767949.png)
+![78901776794](images/1789017767949.png)
 
 ## 主键优化
 

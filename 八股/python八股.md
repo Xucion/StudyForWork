@@ -26,7 +26,7 @@ URL路径的一部分/book/{id}；指向唯一的，特定的资源，GET方法�
 
 位置：HTTP请求的消息体（body）中。作用：创建、更让新资源，携带大量数据，如JSON。方法：POST，PUT
 
-![78911671283](C:\Users\Administrator\Desktop\study\八股\images\1789116712833.png)
+![78911671283](images/1789116712833.png)
 
 类型注解：pydantic里的Field函数
 
@@ -65,7 +65,7 @@ async def m1(request, call_next):
 
 创建依赖项--->导入Depends--->声明依赖项
 
-![78913113795](C:\Users\Administrator\Desktop\study\八股\images\1789131137952.png)
+![78913113795](images/1789131137952.png)
 
 ## ORM
 
