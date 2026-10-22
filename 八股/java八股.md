@@ -1103,11 +1103,67 @@ equals为true，hashcode一定ture；hashcode为true，equals不一定true（has
 
 # Java集合概念
 
-## 概念
+## 数组和集合区别，用过哪些？
+数组和集合区别
+* 数组是固定长度的数据结构，一旦创建长度就无法改变，而常见的ArrayList、HashSet等集合支持动态增删元素。不过Arrays.asList()返回的列表是固定大小的。
+```
+List<String> list = Arrays.asList("a", "b", "c");
+list.add("d");      // ❌ 抛 UnsupportedOperationException
+list.remove(0);     // ❌ 抛 UnsupportedOperationException
+list.set(0, "x");   // ✅ 可以（修改元素）
+```
+* 数组库包含基本数据类型和对象，而集合只能包含对象。
+* 数组通过下标访问元素，List也支持list.get(index)访问；Map通过key查找value。Set没有下标，只能通过contains 判断存在性。
 
-------
+Java集合类：
+* ArrayList：动态数组，实现了List接口，支持动态增长。
+* LinkedList：双向链表，实现了List和Deque接口，头尾插入、删除很快，按下标操作则需要先遍历定位。
+* HashMap：基于哈希表的Map实现，存储键值对，通过键快速查找值。
+* HashSet：基于HashMap实现的Set集合，用于存储唯一元素。
+* TreeMap：基于红黑树实现的有序Map集合，可以按照键的顺序进行排序。
+* LinkedHashMap：基于哈希表和双向链表实现的Map集合，保持插入顺序或访问顺序。
+* PriorityQueue：优先队列，保证队头是优先级最高（默认最小）的元素，但遍历整个队列并不保证有序。用二叉堆实现。
+![](images/17925847075885.jpg)
 
-------
+
+
+List是有序的Collection,使用此接口能够精确的控制每个元素的插入位置,用户能根据索引访问List中元素。
+```    
+    list.add(0, "HEAD");             // 插到最前面 → [HEAD, A, X, B, C]
+    list.add(list.size(), "TAIL");   // 插到最后
+    list.set(2, "Y");                // 替换下标 2 的元素 → [HEAD, A, Y, B, C]
+    list.remove(1);                  // 删下标 1 的元素，后面自动前移
+    String first = list.get(0);      // "HEAD"
+    String last  = list.get(list.size() - 1);  // "C"
+```
+*    ArrayList是容量可辨的非线程安全列表，底层使用数组实现，当集合扩容时，会创建更大的数组，并把原数组复制到新数组。ArrayList支持堆元素的快速随机访问，在尾部追加/删除元素效率很高，但在中间位置插入/删除需要搬移元素，代价较高。
+*    LinkedList本质是一个双向链表，支持高效的头尾插入/删除和作为双端队列使用。“LinkedList插入/删除比ArrayList更快”是一个误区：其O（1）的前提是已经持有目标节点的引用；如果要在任意位置插入/删除仍然需要先O(n)遍历找到位置。
+
+Set不允许存在重复的元素，但是否有序取决于其实现类：HashSet不保证顺序，LinkedHashSet保留插入顺序，TreeSet按比较规则排序。
+*    HashSet通过HashMap实现，HashMap的Key即HashSet存储的元素，所有Key都是用相同的value，一个名为PRESENT的Object类型常量，使用Key保证元素唯一性，但不保证有序性。HashMap是非线程安全的，所有HashSet也是非线程安全的。
+*    LinkedHashSet继承自HashSet,通过LinkedHashMap实现,使用双向链表维护元素插入顺序。
+*    TreeSet通过TreeMap实现，添加元素到集合时，按照比较规则将其插入合适位置，保证插入后的集合仍然有序。
+
+Map是一个键值对集合，存储键、值和之间的映射。Key唯一，value可以重复；遍历顺序由实现类决定，比如HashMap不保证顺序，TreeMap按key排序。Map没有继承于Collection接口，从Map集合中检索元素时，只要给出键对象，就会返回对应的值对象。
+*    HashMap：JDK1.8之前HashMap由数组+链表组成，数组是HashMap的主体，链表则是主要为了解决哈希冲突而存在的（拉链法）。JDK1.8后在解决哈希冲突时有了较大变化：以JDK8的put为例，当桶中已经有至少8个节点，再插入一个新节点（插入后长度至少为9），且哈希数组长度>=64时，才会将该链表转化为红黑树，以减少搜索时间；如果数组长度<64，则只会扩容，不会树化。
+*    LinkedHashMap：LinkedHashMap继承自HashMap，所以它的底层仍然是基于拉链式hash结构，即由数组和链表或红黑树组成。LinkedHashMap在上面结构的基础上，增加了一条双向链表，使得上面的结构可以保持键值对的插入顺序。同时通过对链表进行相应的操作，实现了访问顺序相关逻辑。
+        LinkedHashMap(int initialCapacity, float loadFactor, boolean accessOrder) accessOrder = false（默认）：链表按插入顺序，get 不移动节点。accessOrder = true：每次 get/put 命中已有 key，afterNodeAccess 就把该节点移到链表尾部，从而最近访问的在尾、最久未访问的在头。
+*    Hashtable：数组+链表
+*    TreeMap：红黑树（自平衡的排序二叉树）
+*    ConcurrentHashMap：Node数组+链表+红黑树实现，线程安全的（jdk1.8之前Segment锁，1.8以后volatile+CAS或者synchronized）
+
+## Java中线程安全的集合是什么
+遗留类：Vector 和 Hashtable 是早期线程安全的集合，所有方法都加 synchronized，性能较差，现代代码中已不推荐使用。
+
+java.util.concurrent 包还提供了多种线程安全的集合：
+并发Map：
+* ConcurrentHashMap：其于Hashtable主要区别在于是二者加锁粒度的不同，在JDK1.7，ConcurrentHashMap加的是分段锁，也就是Segment锁，每个Segment含有整个table的一部分，这样不同分段之间的并发操作就互不影响。在JDK1.8，取消了Segemtn锁，直接在table
+
+
+
+-------------------------------------------
+
+-------------------------------------------
 
 # 内存结构
 
@@ -1229,19 +1285,19 @@ JVM运行时内存共分为虚拟机栈、堆、方法区（后被元空间取�
 ### - StringTable
     StringTable串池特性
     其本质是一个Hash表，存String对象的引用（地址）
-*             常量池中的字符串仅是符号，第一次用到时才变为对象
-*             利用串池的机制，来避免重复创建字符串对象
-*             字符串变量拼接的原理是StringBuilder（1.8）
-*             字符串常量拼接的原理是编译期优化
-*             可以使用**intern**方法，主动将串池中还没有的字符串对象放入串池。
-    *            1.6将这个字符串对象尝试放入串池，如果有就返回常量池中的对象，如果没有会把堆中的字符串**复制一份**到常量池中（1.6常量池在永久代中），会把串池中的对象返回。 
-    *            1.8将这个字符串对象尝试放入串池，如果有就返回常量池中的对象，如果没有会把堆中该对象的**引用地址存入**常量池（因为1.8中，常量池移到了堆中），会把串池中的对象返回。 
+*    常量池中的字符串仅是符号，第一次用到时才变为对象
+*    利用串池的机制，来避免重复创建字符串对象
+*    字符串变量拼接的原理是StringBuilder（1.8）
+*    字符串常量拼接的原理是编译期优化
+*    可以使用**intern**方法，主动将串池中还没有的字符串对象放入串池。
+    *        1.6将这个字符串对象尝试放入串池，如果有就返回常量池中的对象，如果没有会把堆中的字符串**复制一份**到常量池中（1.6常量池在永久代中），会把串池中的对象返回。 
+    *        1.8将这个字符串对象尝试放入串池，如果有就返回常量池中的对象，如果没有会把堆中该对象的**引用地址存入**常量池（因为1.8中，常量池移到了堆中），会把串池中的对象返回。 
 
     StringTable垃圾回收
-*     扩大桶的数量，减少冲突。
+*    扩大桶的数量，减少冲突。
     StringTable性能调优
-*     调整-XX:StringTableSize=桶个数
-*     考虑将字符串对象是否入池
+*    调整-XX:StringTableSize=桶个数
+*    考虑将字符串对象是否入池
     *     如果系统中有大量内容重复的字符串对象，将他们入池后，所有引用都会指向StringTable中的同一示例，堆内存中的重复对象会被GC回收。
     *     如果字符串都在池中，使用==比较引用地址的速度是O(1)，快于equals()的O(n)
     *     ------------------
