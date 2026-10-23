@@ -611,7 +611,7 @@ Throwable的成员方法
 
 ​	线程是操作系统能够进行运算调度的最小单位。他被包含在进程之中，是进程中的实际运作单位。 
 
-并发
+并发（微观串行，宏观并行）
 
 ​	在同一时刻，有多个指令在单个cpu上交替执行
 
@@ -619,41 +619,78 @@ Throwable的成员方法
 
 ​	在同一时刻，有多个指令在多个cpu上同时执行。（虽然只有一个cpu，但是cpu是多核多线程的，2核4线程就是可以同时执行4个线程）
 
-## 多线程的实现方式
+## 创建线程的方式
 
 1继承Thread类的实现方式
-
-```
 * 1多线程的第一种启动方式自定定义一个类，继承Thread
 * 2重写run方法
 * 3创建子类的对象，并启动线程（start方法）
-```
+**start方法和run方法什么区别？**
+    start用来启动线程，通过该线程调用run方法执行。start方法只能调用一次。
+    run封装了要被线程执行的代码，可以被调用多次。
+
 
 2实现Runnable接口的方式进行实现的
-
-```
 * 1多线程的第二种启动方式：自己实现Runnable接口
-* 2重写里面的run方法
+    class MyRunnable implements Runnable{}
+* 2重写里面的run方法（run方法不能抛异常）
 * 3创建自己的类的对象
+    MyRunnable mr = new MyRunnable();
 * 4创建一个thread类的对象，并开启线程
-
+    Thread t1 = new Thread(mr);
 由于只会创建以此MyRunnable的对象，所以MyRunnable中的成员变量不用加static关键字了，非常适合多个相同线程来处理同一份资源的情况。
-```
 
 3利用Callable接口和Future接口方式实现
-
-```
-*   特点：可以获取到多线程运行的结果
+特点：**可以获取到多线程运行的结果**
 * 1.创建一个类Mycallable实现Callable接口
-* 2.重写call方法（是有返回值的，表示多线程运行的结果）
-* 3.创建MyCallable的对象(表示多线程要执行的任务)     			 MyCallable3 mc = new MyCallable3();
-* 4.创建Future的对象（作用管理多线程运行的结果，泛型是结果的类型）	FutureTask<Integer> ft = new FutureTask<>(mc);
-* 5.创建Thread类的对象，并启动（表示线程）						Thread t1 = new Thread(ft);
+    MyCallable implements Callable<重写方法的返回类型>
+* 2.重写call方法（是有返回值的，表示多线程运行的结果。可以抛异常）
+    public String call(){...}
+* 3.创建MyCallable的对象(表示多线程要执行的任务)     
+    MyCallable mc = new MyCallable();
+* 4.创建Future的对象（作用管理多线程运行的结果，泛型是结果的类型）
+    FutureTask<String> ft = new FutureTask<String>(mc);
+* 5.创建Thread类的对象，并启动（表示线程）
+    Thread t1 = new Thread(ft);
+    t1.start();
+    String result = ft.get();
+![78843999549](images/1788439995491.png)    
+4.采用[线程池](#线程池)
+    线程池的核心思想是**复用线程、控制并发、管理任务队列** Java通过Executor框架提供
+* Executor 框架 = java.util.concurrent 包里围绕"任务提交与执行"设计的一组类型，包括：
+    * 接口：Executor、ExecutorService、ScheduledExecutorService
+    * 实现类：ThreadPoolExecutor、ScheduledThreadPoolExecutor、ForkJoinPool
+    * 工具类：Executors
+    * 配套：Future、Callable、Runnable、阻塞队列等
+创建方式：
+* Executors工具类，Executor.newXXX();生产慎用！因为其默认队列/线程数无界，容易OOM。应该手动new ThreadPoolExecutor(...)。
+* 手动new ThreadPoolExecutor
+```java
+ThreadPoolExecutor pool = new ThreadPoolExecutor(
+    4,                              // corePoolSize 核心线程数
+    8,                              // maximumPoolSize 最大线程数
+    60L, TimeUnit.SECONDS,          // keepAliveTime 非核心线程空闲存活时间
+    new ArrayBlockingQueue<>(100),  // workQueue 有界任务队列
+    new ThreadFactory() {           // threadFactory 自定义线程工厂（命名、daemon 等）
+        private final AtomicInteger idx = new AtomicInteger(1);
+        @Override
+        public Thread newThread(Runnable r) {
+            Thread t = new Thread(r, "my-pool-" + idx.getAndIncrement());
+            t.setDaemon(false);
+            return t;
+        }
+    },
+    new ThreadPoolExecutor.AbortPolicy() // 拒绝策略
+);
+
+// 提交任务
+pool.execute(() -> { /* ... */ });
+Future<String> f = pool.submit(() -> "done");
+
+// 关闭
+pool.shutdown();
 ```
 
-4.采用[线程池](#线程池)
-
-![78843999549](images/1788439995491.png)
 
 ## 常见的成员方法
 
@@ -773,11 +810,53 @@ Lock是接口，不能实例化，需要采用实现类ReentranLock来实例化�
 
 
 ### volatile关键字
+底层是内存屏障。
+* 保证线程间的可见性
+    **为什么需要？？** 因为JVM虚拟机中有一个JIT（即使编译器）给代码做了优化（代码执行次数太多后，就把条件改成了一个固定的条件）。加了volatile之后，就告诉JIT，不要对volatile修饰的变量做优化。
+![1792747881](images/1792747881.png)
 
-volatile保证不同线程对共享变量操作的可见性，也就是说一个线程修改了volatile修饰的变量，当修改写回主内存时，另外一个线程立即看到最新的值。
+    volatile保证不同线程对共享变量操作的可见性，也就是说一个线程修改了volatile修饰的变量，当修改写回主内存时，另外一个线程立即看到最新的值。
+但是要注意：
+    缓存失效机制：现代 JVM 会在一段时间后自动失效线程的本地缓存，强制从主内存重新加载变量。200ms 的休眠时间通常足够触发这种机制。 
+* 禁止指令重排序
+    用volatile修饰共享变量会在读、写共享变量时加入不同的屏障，防止其他读写操作越过屏障，从而达到阻止重排序的效果。
+    **什么是指令重排序？？**  以下代码可能会出现r1=0,r2=1的情况。
+    ```java
+    int x;
+    int y;
+    @Actor
+    public void actor1(){
+        x=1;
+        y=1;
+    }
+    @Actor 
+    public void actor2(II_Result r){}
+        r.r1=y; 
+        r.r2=x;
+    }
+    ```
+![1792749468](images/Clipboard_Screenshot_1792749468.png)
 
-​      但是volatile不保证原子性。
+* ​但是volatile不保证原子性。
+    以 i++ 为例，它不是一条指令，而是三步：
+    ```java
+    i++;   // 实际是：
+    // 1. 读 i 的值（load）
+    // 2. 计算 i + 1（add）
+    // 3. 写回 i（store）
+    ```
+    假设两个线程同时对 i++：
 
+| 时刻 | 线程 A | 线程 B | 主内存 i |
+|------|--------|--------|----------|
+| t1 | 读 i = 0 |  | 0 |
+| t2 |  | 读 i = 0 | 0 |
+| t3 | 计算 0+1=1 |  | 0 |
+| t4 |  | 计算 0+1=1 | 0 |
+| t5 | 写回 i = 1 |  | 1 |
+| t6 |  | 写回 i = 1 | 1 |
+   期望 i = 2，实际 i = 1。volatile 保证了 t5/t6 的写"立刻可见"，但挡不住 t1、t2 都读到 0——"读-改-写"三步之间可以被其他线程插入。原子性要求这三步作为一个整体不可分割，volatile 做不到。
+   
 ### CAS & Synchronized
 
 CAS(Compare And Swap)
@@ -787,8 +866,17 @@ Synchronized是从悲观的角度出发：
 ​	总是假设最坏的情况，每次去拿数据的时候都认为别人会修改，所以每次在拿数据的时候都会上锁，这样别人想拿这个数据就会阻塞直到它拿到锁（**共享资源每次只给一个线程使用，其它线程阻塞，用完后再把资源转让给其它线程**）。因此Synchronized我们也将其称之为悲观锁。jdk中的ReentrantLock也是一种悲观锁。
 
 CAS是从乐观的角度出发:
-
 ​	总是假设最好的情况，每次去拿数据的时候都认为别人不会修改，所以不会上锁，但是在更新的时候会判断一下在此期间别人有没有去更新这个数据。CAS这种机制我们也可以将其称之为乐观锁。
+​	可以在无锁状态下保证线程操作数据的原子性。
+​	用到的地方AQS框架、AtomicXXX类。
+​	如果CAS失败了，会开始自旋。
+* ​	因为没有加锁，所以线程不会陷入阻塞，效率较高。
+*  如果竞争激烈，重试频繁发生，效率会受影响。
+CAS底层实现：
+    CAS底层依赖于一个Unsafe类来直接调用操作系统底层的CAS指令。
+    ![1792656911](images/1792656911.png)
+
+
 
 ## 线程的通信
 
@@ -843,7 +931,7 @@ public static ExecutorService newFixdThreadPool();      创建有上限的线程
 
 核心参数 
 
-* ```
+* ```java
     ThreadPoolExecutor threadPool = new ThreadPoolExecutor(
         corePoolSize, // 核心线程数 线程池长期维持的最小线程数
         corePoolSize * 2, // 最大线程数 线程池能容纳的最多线程数
@@ -1128,7 +1216,7 @@ Java集合类：
 
 
 List是有序的Collection,使用此接口能够精确的控制每个元素的插入位置,用户能根据索引访问List中元素。
-```    
+```Java    
     list.add(0, "HEAD");             // 插到最前面 → [HEAD, A, X, B, C]
     list.add(list.size(), "TAIL");   // 插到最后
     list.set(2, "Y");                // 替换下标 2 的元素 → [HEAD, A, Y, B, C]
@@ -1157,15 +1245,87 @@ Map是一个键值对集合，存储键、值和之间的映射。Key唯一，va
 
 java.util.concurrent 包还提供了多种线程安全的集合：
 并发Map：
-* ConcurrentHashMap：其于Hashtable主要区别在于是二者加锁粒度的不同，在JDK1.7，ConcurrentHashMap加的是分段锁，也就是Segment锁，每个Segment含有整个table的一部分，这样不同分段之间的并发操作就互不影响。在JDK1.8，取消了Segemtn锁，直接在table
+* ConcurrentHashMap：其于Hashtable主要区别在于是二者加锁粒度的不同，在JDK1.7，ConcurrentHashMap加的是分段锁，也就是Segment锁，每个Segment含有整个table的一部分，这样不同分段之间的并发操作就互不影响。在JDK1.8，取消了Segemtn锁，直接在table元素（桶的头节点）上加锁，使得加锁粒度缩小到单个桶级别。
+    * 对于put操作，如果Key对应的桶（数组的一个下标位置table[i]）为null，则通过CAS操作将新节点写入该桶。
+    * 如果桶不为空，则对该头节点使用sychronized加锁，然后遍历桶中的数据进行替换或新增。
+并发Set：
+并发List：
+并发Queue：
+Deque：
+## Collections和Collection的区别
+* Collection上Java集合框架中的一个接口，是一个List、Set、Queue等接口的上层接口，Map不继承它。它定义了一组通用的操作和方法，如添加、删除、遍历等，用于操作和管理一组对象。
+* Collections是Java提供的一个工具类，位于java.util包中。它提供了一系列静态方法，用于对集合进行操作和算法
+![1792662880](images/1792662880.png)
+## 集合遍历的方法
+List<String> List = new ArrayList<>();
+list.add("A");
+list.add("B");
+list.add("C");
+* 普通 for 循环：可以使用带有索引的普通 for 循环来遍历 List。
+```
+for（int i =0; i<list.size();i++){
+    String element = list.get(i);
+    System.out.println(element);
+}
+```
+* 增强 for 循环（for-each循环）：用于循环访问数组或集合中的元素。
+```
+for (String element : list) {
+    System.out.println(element);
+}
+```
+* Iterator 迭代器：可以使用迭代器来遍历集合，特别适用于需要删除元素的情况。
+```
+Iterator<String> iterator = list.iterator();
+while(iteractor.hasnext()){
+    String element = iterator.next();
+    System.out.println(element);
+}
+```
+* 使用 forEach 方法：Java 8引入了 forEach 方法，可以对集合进行快速遍历。
+```
+list.forEach(element -> System.out.println(element));
+```
+* Stream API：Java 8的Stream API提供了丰富的功能，可以对集合进行函数式操作，如过滤、映射等。
+```
+list.stream().forEach(element -> System.out.println(element));
+```
+
+
+# List
+
+-------------------------------------------
+# JUC
+# 进程、线程、协程
+* 进程
+    进程时OS进行资源分配和调度的基本单位。是正在运行程序的实例，每个进程有独立的内存空间（堆、栈、代码段、数据段），进程之间相互隔离。
+    
+* 线程（适用CPU密集型）
+    线程是CPU调度的基本单位，是进程内的执行流。同一进程内的线程共享堆和方法区，但各有独立的栈和程序计数器。
+    java中的体现：
+    * java线程是**内核级线程**（1:1映射到操作系统线程），由JVM调用OS的线程API创建
+    * 4 种创建方式：继承Thread、实现Runable/Callable、线程池
+    特点：
+    * 共享内存，通信方便（wait/notify、BlockingQueue、CompletableFuture）但是需要处理线程安全问题
+    * 上下文切换成本比进程低，但仍需内核介入（微秒级）
+    * 线程数量受限于OS（通常几千个就吃力），每个线程默认栈约1MB
+
+* 协程（Coroutine/虚拟线程）（适用I/O密集、高并发）
+    java原生直到 JDK19预览、JDK21正式 才引入**虚拟线程**，这是Java对协程的官方实现（JEP444）。
+    虚拟线程的核心思想：
+    * M:N调度：大量虚拟线程（M）映射到少量平台线程（N，即载体线程carrier thread）上
+    * 由JVM而非OS调度，遇到阻塞（I/O、sleep）时**自动让出载体线程**（挂起，栈帧移到堆上）
+    * 创建成本极低（约几百字节），可以轻松创建百万级
+## 并发和并行的区别
+现在都是多核CPU，在多核CPU下
+* 并发是同一时间 deal with 多件事情（任务）的能力，多个线程轮流使用一个或多个CPU
+* 并行是同一时间 doing 多件事情的能力，4核CPU同时执行4个线程
 
 
 
 -------------------------------------------
 
--------------------------------------------
-
-# 内存结构
+# JVM 内存结构
 
 ## JVM的内存模型介绍一下
 
@@ -1455,6 +1615,7 @@ public class UserService {
 
 ​	在企业级（web）应用里面,我们一般把比较耗时的事情放在系统启动的时候完成。
 
+ 
 ## DI（依赖注入）
 
 **DI** 是 IoC 的具体实现方式，它的核心意思是：**当 A 对象需要 B 对象时，不是由 A 自己 new B，而是由外部容器把 B 注入给 A。**
@@ -1464,6 +1625,7 @@ public class UserService {
 | **构造器注入**  | ` @Autowired public UserService(UserDao dao) { this.dao = dao; }` | ✅ **最推荐**（不可变，易测试）   |
 | **Setter 注入** | `@Autowired public void setDao(UserDao dao)`                 | ⚠️ 可选                           |
 | **字段注入**    | `@Autowired private UserDao dao;`                            | ❌ 虽然方便，但不推荐（难以测试） |
+
 
 ## AOP（面向切面编程）
 
@@ -1484,6 +1646,7 @@ public class UserService {
 | **性能监控** | 统计方法执行耗时               | `@Around` 计算时间差          |
 | **缓存管理** | 先从缓存取，没有则查数据库     | `@Around` 控制缓存逻辑        |
 | **异常处理** | 统一捕获异常并返回友好提示     | `@AfterThrowing`              |
+
 
 Spring AOP支持两种动态代理：
 
